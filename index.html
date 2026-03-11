@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncAlarm - Client</title>
+    <meta name="theme-color" content="#ff6b35">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #ff6b35; --primary-dark: #e85d2e; --secondary: #ffc857;
+            --bg: #1a1423; --surface: #2d1b3d; --surface-hover: #3d2851;
+            --text: #f4e8ff; --text-dim: #b39bc8; --border: #4a3766;
+            --danger: #ff3366; --success: #00d4aa; --warning: #ffaa00;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'JetBrains Mono',monospace; background:linear-gradient(135deg,var(--bg) 0%,#0f0a1a 100%); color:var(--text); min-height:100vh; overflow-x:hidden; }
+
+        /* BG status bar */
+        #bgBar { display:none; position:fixed; top:0; left:0; right:0; background:#1a1423; border-bottom:1px solid var(--border); padding:6px 16px; font-size:11px; color:var(--text-dim); z-index:9000; align-items:center; gap:10px; }
+        #bgBar.on { display:flex; }
+        .bdot { width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 6px var(--success); animation:blink 2s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+        /* Notif banner */
+        #notifBanner { display:none; position:fixed; bottom:90px; right:20px; background:var(--surface); border:2px solid var(--warning); border-radius:12px; padding:16px 20px; max-width:300px; z-index:8000; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+        #notifBanner.on { display:block; }
+        #notifBanner p { font-size:12px; color:var(--text-dim); margin-bottom:10px; line-height:1.5; }
+        .ntitle { font-size:13px; font-weight:600; color:var(--warning); margin-bottom:6px; }
+        .nbtns { display:flex; gap:8px; }
+        .nbtns button { flex:1; padding:8px; border:none; border-radius:6px; font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; text-transform:uppercase; }
+        .ballow { background:var(--warning); color:#000; }
+        .bdismiss { background:var(--surface-hover); color:var(--text-dim); }
+
+        .login-container { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px; }
+        .login-box { background:var(--surface); border:2px solid var(--border); border-radius:16px; padding:48px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(255,107,53,.15); }
+        .logo { font-family:'Syne',sans-serif; font-size:42px; font-weight:800; text-align:center; margin-bottom:8px; background:linear-gradient(135deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; letter-spacing:-1px; }
+        .subtitle { text-align:center; color:var(--text-dim); font-size:13px; margin-bottom:40px; text-transform:uppercase; letter-spacing:2px; }
+        .form-group { margin-bottom:24px; }
+        .form-group label { display:block; margin-bottom:8px; font-size:13px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
+        input[type=text],input[type=password],select,textarea { width:100%; padding:14px 16px; background:var(--bg); border:2px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:14px; transition:all .2s; }
+        input:focus,select:focus,textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(255,107,53,.1); }
+        .btn { width:100%; padding:14px; background:linear-gradient(135deg,var(--primary),var(--primary-dark)); border:none; border-radius:8px; color:#fff; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; text-transform:uppercase; letter-spacing:1px; }
+        .btn:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(255,107,53,.3); }
+        .btn-secondary { background:var(--surface-hover); }
+        .btn-secondary:hover { background:var(--border); box-shadow:none; }
+        .btn-success { background:linear-gradient(135deg,var(--success),#00aa88); }
+        .btn-sm { padding:8px 16px; width:auto; font-size:12px; }
+
+        .app-container { display:none; max-width:900px; margin:0 auto; padding:24px; }
+        .app-container.padtop { padding-top:40px; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; padding:24px; background:var(--surface); border:2px solid var(--border); border-radius:16px; }
+        .header-left h1 { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; background:linear-gradient(135deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .user-info { font-size:12px; color:var(--text-dim); margin-top:4px; }
+        .header-right { display:flex; gap:8px; align-items:center; }
+        .bg-pill { display:none; padding:5px 12px; background:rgba(0,212,170,.15); border:1px solid var(--success); border-radius:20px; font-size:11px; color:var(--success); align-items:center; gap:6px; }
+        .bg-pill.on { display:flex; }
+        .bg-pill .dot { width:6px; height:6px; border-radius:50%; background:var(--success); animation:blink 2s infinite; }
+
+        .card { background:var(--surface); border:2px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
+        .card h3 { font-family:'Syne',sans-serif; font-size:20px; margin-bottom:20px; color:var(--primary); }
+
+        /* feature status */
+        .feat-bar { background:rgba(0,212,170,.05); border:1px solid rgba(0,212,170,.2); border-radius:10px; padding:12px 16px; margin-bottom:20px; font-size:11px; }
+        .feat-bar strong { color:var(--success); display:block; margin-bottom:8px; }
+        .feat-row { display:flex; gap:16px; flex-wrap:wrap; }
+        .feat { display:flex; align-items:center; gap:4px; }
+        .feat .fi { font-size:13px; }
+        .fon { color:var(--success); }
+        .foff { color:var(--text-dim); opacity:.5; }
+
+        .messages-container { max-height:500px; overflow-y:auto; padding-right:8px; }
+        .messages-container::-webkit-scrollbar { width:8px; }
+        .messages-container::-webkit-scrollbar-track { background:var(--bg); border-radius:4px; }
+        .messages-container::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+        .message-item { background:var(--bg); border:2px solid var(--border); border-radius:8px; padding:16px; margin-bottom:12px; transition:all .2s; }
+        .message-item.unread { border-color:var(--primary); background:rgba(255,107,53,.05); }
+        .message-item:hover { transform:translateX(4px); }
+        .message-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+        .message-meta { font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
+        .message-badge { padding:4px 8px; background:var(--primary); color:#fff; border-radius:12px; font-size:10px; font-weight:600; }
+        .message-content { margin:12px 0; font-size:14px; line-height:1.6; }
+        .response-form { display:grid; gap:16px; margin-top:20px; }
+
+        /* alarm overlay */
+        .alarm-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.95); z-index:9999; justify-content:center; align-items:center; }
+        .alarm-overlay.active { display:flex; }
+        .alarm-content { background:var(--surface); border:4px solid var(--primary); border-radius:20px; padding:48px; max-width:600px; text-align:center; animation:apulse 1s infinite; }
+        @keyframes apulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.02)} }
+        .alarm-title { font-family:'Syne',sans-serif; font-size:36px; font-weight:800; color:var(--primary); margin-bottom:24px; }
+        .alarm-message { font-size:18px; line-height:1.6; margin-bottom:32px; }
+
+        /* minimized FAB */
+        .minimized { position:fixed; bottom:20px; right:20px; background:var(--surface); border:2px solid var(--primary); border-radius:50%; width:60px; height:60px; display:none; justify-content:center; align-items:center; cursor:pointer; box-shadow:0 8px 24px rgba(255,107,53,.4); transition:all .2s; z-index:1000; }
+        .minimized:hover { transform:scale(1.1); }
+        .minimized.active { display:flex; }
+        .notification-badge { position:absolute; top:-5px; right:-5px; background:var(--danger); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; justify-content:center; align-items:center; font-size:11px; font-weight:600; }
+
+        @media(max-width:768px) { .header{flex-direction:column;gap:16px;} .header-right{width:100%;} .btn-sm{flex:1;} }
+    </style>
+</head>
+<body>
+
+<div id="bgBar"><span class="bdot"></span><span>SyncAlarm active in background — alarms will still reach you</span></div>
+
+<div id="notifBanner">
+    <div class="ntitle">🔔 Enable Background Alerts</div>
+    <p>Allow notifications so SyncAlarm can alert you even when this tab is minimized.</p>
+    <div class="nbtns">
+        <button class="ballow" onclick="requestNotifPermission()">Allow</button>
+        <button class="bdismiss" onclick="dismissNotifBanner()">Not now</button>
+    </div>
+</div>
+
+<div id="loginScreen" class="login-container">
+    <div class="login-box">
+        <div class="logo">SyncAlarm</div>
+        <div class="subtitle">Client Portal</div>
+        <div class="form-group"><label>Select Group</label><select id="loginGroup"><option value="">Loading groups...</option></select></div>
+        <div class="form-group"><label>Group ID</label><input type="text" id="loginGroupId" placeholder="Enter your group ID"></div>
+        <div class="form-group"><label>Username</label><input type="text" id="loginUsername" placeholder="Enter your name"></div>
+        <button class="btn" onclick="login()">Login</button>
+    </div>
+</div>
+
+<div id="appContainer" class="app-container">
+    <div class="header">
+        <div class="header-left">
+            <h1>SyncAlarm</h1>
+            <div class="user-info" id="userInfo"></div>
+        </div>
+        <div class="header-right">
+            <div class="bg-pill" id="bgPill"><span class="dot"></span><span>Background active</span></div>
+            <button class="btn btn-sm btn-secondary" onclick="minimizeApp()">Minimize</button>
+            <button class="btn btn-sm btn-secondary" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="feat-bar" id="featBar">
+        <strong>Background Running Status</strong>
+        <div class="feat-row">
+            <div class="feat"><span class="fi">🔔</span><span id="f-notif" class="foff">OS Notifications</span></div>
+            <div class="feat"><span class="fi">⚙️</span><span id="f-sw" class="foff">Service Worker</span></div>
+            <div class="feat"><span class="fi">🔒</span><span id="f-wake" class="foff">Wake Lock</span></div>
+            <div class="feat"><span class="fi">👁️</span><span id="f-vis" class="fon">Visibility API ✓</span></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Messages</h3>
+        <div class="messages-container" id="messagesContainer"><div style="color:var(--text-dim);font-size:13px;text-align:center;padding:20px;">No messages yet</div></div>
+    </div>
+
+    <div class="card">
+        <h3>Send Response</h3>
+        <div class="response-form">
+            <textarea id="responseText" rows="4" placeholder="Type your response..."></textarea>
+            <button class="btn btn-success" onclick="sendResponse()">Send Response</button>
+        </div>
+    </div>
+</div>
+
+<div id="minimizedBtn" class="minimized" onclick="restoreApp()">
+    <span style="font-size:24px;">🔔</span>
+    <div class="notification-badge" id="notificationBadge" style="display:none;">0</div>
+</div>
+
+<div id="alarmOverlay" class="alarm-overlay">
+    <div class="alarm-content">
+        <div class="alarm-title">🚨 ALARM</div>
+        <div class="alarm-message" id="alarmMessage"></div>
+        <button class="btn" onclick="dismissAlarm()">Acknowledge</button>
+    </div>
+</div>
+
+<audio id="notificationAudio" preload="auto" loop></audio>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────
+const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbypeuBq1TWco5Z6M2HS--jS_aEizmuAK9nxlpYaP1z3OtSSSHNAhn1pHFGaOzA9uaGiFw/exec';
+const POLL_INTERVAL     = 2000;
+const BG_POLL_INTERVAL  = 5000;
+
+// ── STATE ───────────────────────────────────────────────────
+let pollTimer      = null;
+let currentUser    = null;
+let groups         = [];
+let messages       = [];
+let unreadCount    = 0;
+let isMinimized    = false;
+let wakeLock       = null;
+let swReg          = null;
+let notifGranted   = false;
+let titleTimer     = null;
+const originalTitle = document.title;
+
+// ── SERVICE WORKER (blob) ────────────────────────────────────
+// The SW continues polling and fires OS notifications even when the tab is backgrounded.
+const SW_SOURCE = `
+let sheetUrl = null;
+let user = null;
+let lastCount = 0;
+let timer = null;
+
+self.addEventListener('message', ({data}) => {
+  const {type, payload} = data;
+  if (type === 'INIT') { sheetUrl = payload.sheetUrl; user = payload.user; lastCount = payload.count || 0; startPoll(); }
+  if (type === 'SYNC_COUNT') { lastCount = payload.count; }
+  if (type === 'STOP') { if(timer){clearInterval(timer);timer=null;} }
+});
+
+function startPoll() {
+  if (timer) clearInterval(timer);
+  timer = setInterval(poll, ${BG_POLL_INTERVAL});
+}
+
+async function poll() {
+  if (!sheetUrl || !user || sheetUrl.includes('YOUR_DEPLOYMENT_ID')) return;
+  try {
+    const r = await fetch(sheetUrl, {method:'POST', body: JSON.stringify({action:'getMessages', group: user.groupId})});
+    const d = await r.json();
+    if (!d || !d.messages) return;
+    const newCount = d.messages.length;
+    if (newCount > lastCount) {
+      const newMsgs = d.messages.slice(lastCount);
+      lastCount = newCount;
+      for (const msg of newMsgs) {
+        await self.registration.showNotification(
+          msg.type === 'immediate' ? '🚨 ALARM — SyncAlarm' : '📩 New Message — SyncAlarm',
+          { body: msg.content, requireInteraction: msg.type==='immediate',
+            vibrate: msg.type==='immediate' ? [300,100,300,100,300] : [200,100,200],
+            tag: 'sa-'+Date.now(), data: { msgType: msg.type } }
+        );
+      }
+      const clients = await self.clients.matchAll({type:'window'});
+      for (const c of clients) c.postMessage({type:'NEW_MESSAGES', messages: d.messages});
+    }
+  } catch(e) {}
+}
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({type:'window'}).then(clients => {
+      for (const c of clients) if('focus' in c) return c.focus();
+      if (self.clients.openWindow) return self.clients.openWindow('/');
+    })
+  );
+});
+`;
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const blob = new Blob([SW_SOURCE], {type:'application/javascript'});
+    const url  = URL.createObjectURL(blob);
+    swReg = await navigator.serviceWorker.register(url, {scope: '/'});
+    navigator.serviceWorker.addEventListener('message', ({data}) => {
+      if (data.type === 'NEW_MESSAGES') handleMessages(data.messages);
+    });
+    setFeat('f-sw', true);
+  } catch(e) { console.warn('SW:', e); }
+}
+
+function swSend(type, payload={}) {
+  const sw = swReg?.active;
+  if (sw) sw.postMessage({type, payload});
+}
+
+function swInit() {
+  swSend('INIT', {sheetUrl: localStorage.getItem('sheetsUrl'), user: currentUser, count: messages.length});
+}
+
+// ── NOTIFICATIONS ────────────────────────────────────────────
+async function checkNotifSupport() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') { notifGranted = true; setFeat('f-notif', true); }
+  else if (Notification.permission === 'default') {
+    setTimeout(() => document.getElementById('notifBanner').classList.add('on'), 3000);
+  }
+}
+
+async function requestNotifPermission() {
+  dismissNotifBanner();
+  const r = await Notification.requestPermission();
+  if (r === 'granted') { notifGranted = true; setFeat('f-notif', true); }
+}
+
+function dismissNotifBanner() { document.getElementById('notifBanner').classList.remove('on'); }
+
+// ── WAKE LOCK ────────────────────────────────────────────────
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    setFeat('f-wake', true);
+    wakeLock.addEventListener('release', () => setFeat('f-wake', false));
+  } catch(e) {}
+}
+
+async function reacquireWakeLock() {
+  if (!wakeLock || wakeLock.released) await acquireWakeLock();
+}
+
+// ── FEATURE UI ───────────────────────────────────────────────
+function setFeat(id, on) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = on ? 'fon' : 'foff';
+  if (on && !el.textContent.includes('✓')) el.textContent = el.textContent.replace(' ✓','') + ' ✓';
+}
+
+function updateBgPill() {
+  document.getElementById('bgPill').classList.toggle('on', notifGranted || !!swReg);
+}
+
+// ── TITLE FLASH ──────────────────────────────────────────────
+function startTitleFlash(count) {
+  if (titleTimer) return;
+  let flip = false;
+  titleTimer = setInterval(() => {
+    document.title = flip ? `(${count}) 🚨 ALARM` : originalTitle;
+    flip = !flip;
+  }, 900);
+}
+
+function stopTitleFlash() {
+  if (titleTimer) { clearInterval(titleTimer); titleTimer = null; }
+  document.title = originalTitle;
+}
+
+// ── FAVICON ──────────────────────────────────────────────────
+function setFavicon(alarm) {
+  let lnk = document.querySelector("link[rel~='icon']");
+  if (!lnk) { lnk = document.createElement('link'); lnk.rel='icon'; document.head.appendChild(lnk); }
+  lnk.href = alarm
+    ? "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%23ff3366'/><text y='22' x='6' font-size='18'>🚨</text></svg>"
+    : "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%23ff6b35'/><text y='22' x='6' font-size='18'>🔔</text></svg>";
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+async function init() {
+  if (!localStorage.getItem('sheetsUrl')) localStorage.setItem('sheetsUrl', DEFAULT_SHEET_URL);
+  setFavicon(false);
+  await registerSW();
+  loadDefaultAudio();
+  if (localStorage.getItem('clientSession')) {
+    currentUser = JSON.parse(localStorage.getItem('clientSession'));
+    showApp();
+  } else {
+    loadGroups();
+  }
+}
+
+function loadDefaultAudio() {
+  const saved = localStorage.getItem('notificationAudio');
+  const audio = document.getElementById('notificationAudio');
+  audio.src = saved || 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjiP1fPTfC8GKHzM8dybRQwUYrXq7KtYFQxLouLzwXEhBzyT1/PQey0HKn3N8dyaRAwTYbPp66xaFg5MpOL0w3IiBz2U2PPRei0HKn7O8t2aRQwTYbPq66xaFg5MpOLzwG8hBTuS1vPSfC4HK4DN8tyZRAsTYLLp66taFg5No+LywG4gBTuR1fPSfS8HLIHO89yYRAsUYLLp66xbFg5No+LywG4gBTuR1fPSfS8HLIHO89yYRAsUX7Hp7KxcFg5Oo+Hy';
+}
+
+// ── AUTH ─────────────────────────────────────────────────────
+async function loadGroups() {
+  const r = await api('getGroups');
+  if (r?.groups) {
+    groups = r.groups;
+    const sel = document.getElementById('loginGroup');
+    sel.innerHTML = '<option value="">Select a group</option>';
+    groups.forEach(g => { const o = document.createElement('option'); o.value=g.id; o.textContent=g.name; sel.appendChild(o); });
+  }
+}
+
+async function login() {
+  const gSel = document.getElementById('loginGroup').value;
+  const gId  = document.getElementById('loginGroupId').value;
+  const uname= document.getElementById('loginUsername').value;
+  if (!gSel||!gId||!uname) { alert('Please fill all fields'); return; }
+  const group = groups.find(g => g.id === gSel);
+  if (!group || group.id !== gId) { alert('Invalid Group ID'); return; }
+  currentUser = {username:uname, group:group.name, groupId:group.id};
+  localStorage.setItem('clientSession', JSON.stringify(currentUser));
+  await api('clientConnect', {username:uname, group:group.name, groupId:group.id});
+  showApp();
+}
+
+function logout() {
+  if (currentUser) api('clientDisconnect', {username:currentUser.username, groupId:currentUser.groupId});
+  swSend('STOP');
+  stopPolling();
+  localStorage.removeItem('clientSession');
+  currentUser = null;
+  location.reload();
+}
+
+async function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appContainer').style.display = 'block';
+  document.getElementById('userInfo').textContent = `${currentUser.username} • ${currentUser.group}`;
+  await checkNotifSupport();
+  await acquireWakeLock();
+  loadMessages();
+  startPolling();
+  updateOnlineStatus();
+  // Give SW a moment to activate
+  setTimeout(swInit, 800);
+  updateBgPill();
+}
+
+// ── API ──────────────────────────────────────────────────────
+async function api(action, data={}) {
+  const url = localStorage.getItem('sheetsUrl');
+  try {
+    const r = await fetch(url, {method:'POST', body: JSON.stringify({action, ...data})});
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+// ── MESSAGES ─────────────────────────────────────────────────
+async function loadMessages() {
+  const r = await api('getMessages', {group: currentUser.groupId});
+  if (r?.messages) handleMessages(r.messages);
+}
+
+function handleMessages(newMsgs) {
+  const prev = messages.length;
+  messages = newMsgs;
+  if (messages.length > prev) {
+    const incoming = messages.slice(prev);
+    incoming.forEach(msg => {
+      if (msg.type === 'immediate') showAlarm(msg);
+      else playNotif();
+      // OS notification if tab is hidden
+      if (document.hidden && notifGranted) {
+        new Notification(
+          msg.type === 'immediate' ? '🚨 ALARM — SyncAlarm' : '📩 New Message — SyncAlarm',
+          {body: msg.content, requireInteraction: msg.type === 'immediate'}
+        );
+      }
+    });
+    unreadCount += incoming.length;
+    updateBadge();
+    if (document.hidden || isMinimized) {
+      startTitleFlash(unreadCount);
+      setFavicon(true);
+    }
+  }
+  swSend('SYNC_COUNT', {count: messages.length});
+  renderMessages();
+}
+
+function renderMessages() {
+  const c = document.getElementById('messagesContainer');
+  if (!messages.length) { c.innerHTML='<div style="color:var(--text-dim);font-size:13px;text-align:center;padding:20px;">No messages yet</div>'; return; }
+  c.innerHTML = messages.map((m,i) => `
+    <div class="message-item ${i>=messages.length-unreadCount?'unread':''}">
+      <div class="message-header">
+        <span class="message-meta">${m.timestamp} • ${m.sender||'Admin'}</span>
+        ${m.type==='immediate'?'<span class="message-badge">ALARM</span>':''}
+      </div>
+      <div class="message-content">${m.content}</div>
+    </div>
+  `).join('');
+  c.scrollTop = c.scrollHeight;
+}
+
+async function sendResponse() {
+  const content = document.getElementById('responseText').value;
+  if (!content) { alert('Please enter a response'); return; }
+  const r = await api('sendResponse', {content, sender:currentUser.username, group:currentUser.group, groupId:currentUser.groupId, timestamp:new Date().toISOString()});
+  if (r?.success) { document.getElementById('responseText').value=''; alert('Response sent'); }
+}
+
+// ── ALARM ────────────────────────────────────────────────────
+function showAlarm(msg) {
+  document.getElementById('alarmMessage').textContent = msg.content;
+  document.getElementById('alarmOverlay').classList.add('active');
+  playNotif();
+}
+
+function dismissAlarm() {
+  document.getElementById('alarmOverlay').classList.remove('active');
+  stopNotif();
+  unreadCount = Math.max(0, unreadCount-1);
+  updateBadge();
+  if (!unreadCount) { stopTitleFlash(); setFavicon(false); }
+}
+
+function playNotif() { const a=document.getElementById('notificationAudio'); a.play().catch(()=>{}); }
+function stopNotif()  { const a=document.getElementById('notificationAudio'); a.pause(); a.currentTime=0; }
+
+// ── MINIMIZE ─────────────────────────────────────────────────
+function minimizeApp() {
+  isMinimized=true;
+  document.getElementById('appContainer').style.display='none';
+  document.getElementById('minimizedBtn').classList.add('active');
+  updateBadge();
+}
+
+function restoreApp() {
+  isMinimized=false;
+  document.getElementById('appContainer').style.display='block';
+  document.getElementById('minimizedBtn').classList.remove('active');
+  unreadCount=0;
+  updateBadge();
+  stopTitleFlash();
+  setFavicon(false);
+}
+
+function updateBadge() {
+  const b = document.getElementById('notificationBadge');
+  if (unreadCount>0 && isMinimized) { b.textContent=unreadCount; b.style.display='flex'; }
+  else b.style.display='none';
+}
+
+// ── ONLINE STATUS ────────────────────────────────────────────
+async function updateOnlineStatus() {
+  if (!currentUser) return;
+  await api('updateOnlineStatus', {username:currentUser.username, groupId:currentUser.groupId, status:'online'});
+}
+
+// ── POLLING ──────────────────────────────────────────────────
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(() => {
+    if (!document.hidden) { loadMessages(); updateOnlineStatus(); }
+    // When hidden: SW handles it
+  }, POLL_INTERVAL);
+}
+
+function stopPolling() { if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
+
+// ── VISIBILITY ───────────────────────────────────────────────
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden) {
+    document.getElementById('bgBar').classList.remove('on');
+    document.getElementById('appContainer').classList.remove('padtop');
+    await reacquireWakeLock();
+    if (currentUser) { loadMessages(); updateOnlineStatus(); }
+    if (!unreadCount) { stopTitleFlash(); setFavicon(false); }
+  } else {
+    if (currentUser) {
+      document.getElementById('bgBar').classList.add('on');
+      document.getElementById('appContainer').classList.add('padtop');
+    }
+  }
+});
+
+// ── DISCONNECT ON CLOSE ──────────────────────────────────────
+window.addEventListener('beforeunload', () => {
+  if (currentUser) {
+    navigator.sendBeacon(
+      localStorage.getItem('sheetsUrl'),
+      JSON.stringify({action:'clientDisconnect', username:currentUser.username, groupId:currentUser.groupId})
+    );
+  }
+});
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
